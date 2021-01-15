@@ -1,0 +1,79 @@
+---
+title: GPU Scheduling
+author: hetong07
+date: 2021-01-15 15:00:00 -0700
+categories: [Blogging, Technical]
+tags: [GPU, ML Sys, distributed system]
+---
+  
+
+# GPU Scheduling for ML workflow
+
+  
+
+GPU scheduling topic is very popular in both acadamia and industry. Previous focus is on distributed ML system, and key of those researches are the fact in ML training, the parameters do not require strong consistency. The solution is the Parameter server. Therefore, the key for scheduling multiple ML tasks within one cluster is also the ML properties.
+
+## Workload properties
+
+The ML workflow can be divided into two categories: 1) serving tasks and 2) training tasks. For serving tasks, there usually has a SLO, while for training, the bandwidth is more critical (batch processing), and can be terminated abruptly. Due to the different requirements, people usually dedicate cluster for training and serving, respectively.
+
+## GPU properties
+
+Compared to CPU, the memory size of GPU is very limited, tens of GB compared to hundreds of GB. This may incur problem of placing models in GPU: either the model cannot fit, or frequent memory exchange hurts the performance. Moreover, creating a GPU context is also time-consuming.
+
+
+## [Pipeswitch](https://www.usenix.org/conference/osdi20/presentation/bai): scheduling in one machine 
+
+It focuses on how to scheduling ML workfload inside one machine.  As mentioned above, the memory limitation, the increasing model size and the strict SLO pose tough requirement on scheduling. The solution consists of 
+1) Exploit the layer computation feature to divide module into different subgroup to create a computation pipeline to hide memory transfer;
+2) Use double buffer (actually, triple buffers) to amortize the GPU initialization;
+3) Customized memory management: 1) memory usage is invariant. 2) training tasks use memory in a FILO order (due to BP);
+4) Pin GPU memory and allocate in customized manager;
+5) Also store models in above manager to reduce module storage in memory.
+6) Use CPU IPC to notify GPU that data is ready for next pipeline stage since GPU IPC is slow;
+7) Reduce memory usage by separating model and its parameters.
+
+My understanding of 6) is : the worker is a CPU side program which responsible for call GPU API to send data to GPU and start job, and the daemon is in charge of allocating memory. So to avoid using GPU IPC, the daemon only needs to notify worker instead of GPU.
+
+Frankly speaking, the approach used in the paper is not novel, and the major drawback is very obvious: isolation. It also lack of considering for tasks that need multiple GPU. There would be low-utilization issue because the GPU is not spatially shared by different tasks.
+
+## [Antman](https://www.usenix.org/conference/osdi20/presentation/xiao)
+
+Different from Pipeswitch, Antman considering for scheduling GPU workload usually needs multiple GPUs.
+The motivations are 
+
+- Cluster utilization is low
+- Jobs wait time is proportional to the number of GPUs it requires. 4 GPUs job may wait longer than 2 GPU jobs; simply reserve GPUs cannot solve this and it may further decrease utilization;
+-  Memory demands varies during the lifetime of a task ( I think **Pipeswitch** would not agree :) ) and may cause interference for tasks colocated in the same GPU;
+
+### memory management
+The key property this paper leverage is the mini-batch: the memory utilization would drop significantly on the boundary of different mini-batches. At the starting point of each mini-batch, it adjust the GPU memory limit of each job based on its demands ( the number of tensors placed in CPU memory). As I can see, this approach could not totally solve the interference, and if one job continuously expands its memory usage, it would starve/hurts the co-located job. The authors seem to argue that mini-batch guarantees even if the starvation happens, it lasts very shortly due to the mini-batch properties.
+
+### scheduling
+To guard the SLO, the authors provides assign priority for different jobs and create a manager to scheduler to scheduling jobs. The scheduler also use the mini-batch info to predict which GPU is about to idle. To schedule a LE job it does:
+
+- Allocate job in idle GPU, (optional) and guarantee GPUs are all "close";
+- Reserve resource if No. of GPUs cannot be satisfied;
+
+For BE job, what the scheduler does are:
+
+- If the job has been detained for a long time, find a low utilized GPU (not idle) to allocate job
+- Local coordinator limit BE job's memory and SM to reduce interference and gradually increase them it does not hurts the LE job's performance (mini-batch processing time)
+- Also consider the interference severity between different jobs.
+- If possible, promote BE to LE.
+
+### Some thoughts
+- I guess the reason for BE job upgrade is the possibility of starvation of BE job if LE requests are too many; 
+- I am curious that if it is possible to co-locate multiple (>=2) LE jobs in one GPU because LE job may have more predicable memory usage; 
+- It seems that all the control signals are gathered from application (framework) level, it may not be a problem since mini-batch processing time is usually hundreds of milliseconds;
+- Mini-batch and the co-location properties are manually tuned, so if there is an new model emerges, this method may not idle in a short time;
+- Still cannot solve the resource reservation caused low utilization issue. Maybe we can schedule some BE job to the reserved resources?
+- More system level resource limitation is needed in GPU world, e.g. cgroup?
+- Could we utilize the properties of training job (BW critical, more memory, stop abruptly) and serving job (latency critical, less memory, long running)?
+
+
+## [Heterogeneous scheduling](https://www.usenix.org/conference/osdi20/presentation/narayanan-deepak)
+This paper focus on optimizing interconnection (network, PCIE, etc) for distributed ML workload.
+
+
+
