@@ -11,4 +11,3 @@ order: 4
 ---
 
 Personal reading blog, opinions are my own.
-# > **Note**: Add Markdown syntax content to file `_tabs/about.md` and it will show up on this page.
