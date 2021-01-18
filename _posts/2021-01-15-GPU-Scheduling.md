@@ -73,7 +73,31 @@ For BE job, what the scheduler does are:
 
 
 ## [Heterogeneous scheduling](https://www.usenix.org/conference/osdi20/presentation/narayanan-deepak)
-This paper focus on optimizing interconnection (network, PCIE, etc) for distributed ML workload.
+This paper's novelty is that, as far as I know, it is the first paper to address the interconnection issue (Network, PCIE, QPI) as a whole for ML workload. It also proposes the advantage of CPU in ML workload.
 
+### Background
+There are two types of distributed ML systems:
 
+1. All-reduce 
+> In a task that uses all-reduce, only GPU machines are involved. In an iteration, GPUs compute the gradients of the model parameters independently, and then aggregate gradients using the all-reduce primitive.
+2. Parameter Server.
+> In PS tasks, both GPU machines and CPU machines can be used. Different from all-reduce, the gradients are sent to PS, which typically runs on CPU machines and aggregates the received gradients. PS then runs certain DNN training optimizer, e.g., SGD or Adam and sends back the updated model
+
+The core difference is All-reduce is a P2P structure (more specific, **ring** structure), while the PS is a master-slave architecture.
+
+The authors argue that the CPU usage is relatively low in GPU clusters.
+### Solution
+The authors prove the theoretical optimal configuration under different situations, such as, with and without extra CPU available (omit here), and create a scheduler based on the analysis. 
+More interesting part in this paper is to consider the intra-machine communication part. It take the PCI, NVlink etc. into account. The basic idea here is to constrain the data exchange within the **bottleneck region** to mitigate the bandwidth contention, especially:
+
+- PCIe only
+The bottleneck here is the communication across the PCIe switch. So the remedy it. the authors let the GPU within the same PCIe switch to do reduce first, and then send data to CPU, and in turn, to NIC. 
+
+- NVlink
+The bottleneck is the NIC to CPU. So it use the NVlink to exchange data, and let the final aggregator to send data to NIC to reduce contention.
+
+Some other analysis in this paper involves 1) why the divide the SS and CS and how to support async in this dividend; 2) Use pipeline to overlap processing time; 3) Amortize  RDMA WRITE round trip; 4) RDMA related issues (**interesting, you would not know in other places!!!**
+
+### Some thoughts
+I think the novelty in this paper is that it provides the theoretical analysis of the communication pattern in GPU scheduling, and it is the first, as far as I know, to consider the network and connection as whole. It also provides some very interesting knowledge related to RDMA. Such knowledge can be found in a NSDI paper from Microsoft two years ago.Beyond that, it also contributes to the PS architecture by splitting the SS and CS and place them on CPU and GPU, respectively. I am glad to learn so much internal knowledge of ML algorithms.
 
