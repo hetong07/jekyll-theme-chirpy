@@ -1,5 +1,5 @@
 ---
-title: GPU Scheduling
+title: GPU Scheduling for ML workload
 author: hetong07
 date: 2021-01-15 15:00:00 -0700
 categories: [Blogging, Technical]
@@ -7,11 +7,11 @@ tags: [GPU, ML Sys, distributed system]
 ---
   
 
-# GPU Scheduling for ML workflow
+# GPU Scheduling for ML workload
 
   
 
-GPU scheduling topic is very popular in both acadamia and industry. Previous focus is on distributed ML system, and key of those researches are the fact in ML training, the parameters do not require strong consistency. The solution is the Parameter server. Therefore, the key for scheduling multiple ML tasks within one cluster is also the ML properties.
+GPU scheduling topic is very popular in both academia and industry. Previous focus is on distributed ML system, and key of those researches are the fact in ML training, the parameters do not require strong consistency. The solution is the Parameter server. Therefore, the key for scheduling multiple ML tasks within one cluster is also the ML properties.
 
 ## Workload properties
 
@@ -24,7 +24,7 @@ Compared to CPU, the memory size of GPU is very limited, tens of GB compared to 
 
 ## [Pipeswitch](https://www.usenix.org/conference/osdi20/presentation/bai): scheduling in one machine 
 
-It focuses on how to scheduling ML workfload inside one machine.  As mentioned above, the memory limitation, the increasing model size and the strict SLO pose tough requirement on scheduling. The solution consists of 
+It focuses on how to scheduling ML workload inside one machine.  As mentioned above, the memory limitation, the increasing model size and the strict SLO pose tough requirement on scheduling. The solution consists of 
 1) Exploit the layer computation feature to divide module into different subgroup to create a computation pipeline to hide memory transfer;
 2) Use double buffer (actually, triple buffers) to amortize the GPU initialization;
 3) Customized memory management: 1) memory usage is invariant. 2) training tasks use memory in a FILO order (due to BP);
@@ -44,7 +44,7 @@ The motivations are
 
 - Cluster utilization is low
 - Jobs wait time is proportional to the number of GPUs it requires. 4 GPUs job may wait longer than 2 GPU jobs; simply reserve GPUs cannot solve this and it may further decrease utilization;
--  Memory demands varies during the lifetime of a task ( I think **Pipeswitch** would not agree :) ) and may cause interference for tasks colocated in the same GPU;
+-  Memory demands varies during the lifetime of a task ( I think **Pipeswitch** would not agree :) ) and may cause interference for tasks co-located in the same GPU;
 
 ### memory management
 The key property this paper leverage is the mini-batch: the memory utilization would drop significantly on the boundary of different mini-batches. At the starting point of each mini-batch, it adjust the GPU memory limit of each job based on its demands ( the number of tensors placed in CPU memory). As I can see, this approach could not totally solve the interference, and if one job continuously expands its memory usage, it would starve/hurts the co-located job. The authors seem to argue that mini-batch guarantees even if the starvation happens, it lasts very shortly due to the mini-batch properties.
@@ -73,7 +73,7 @@ For BE job, what the scheduler does are:
 
 
 ## [Heterogeneous scheduling](https://www.usenix.org/conference/osdi20/presentation/narayanan-deepak)
-This paper's novelty is that, as far as I know, it is the first paper to address the interconnection issue (Network, PCIE, QPI) as a whole for ML workload. It also proposes the advantage of CPU in ML workload.
+This paper's novelty is that, as far as I know, it is the first paper to address the interconnection issue (Network, PCIe, QPI) as a whole for ML workload. It also proposes the advantage of CPU in ML workload.
 
 ### Background
 There are two types of distributed ML systems:
@@ -94,7 +94,7 @@ More interesting part in this paper is to consider the intra-machine communicati
 The bottleneck here is the communication across the PCIe switch. So the remedy it. the authors let the GPU within the same PCIe switch to do reduce first, and then send data to CPU, and in turn, to NIC. 
 
 - NVlink
-The bottleneck is the NIC to CPU. So it use the NVlink to exchange data, and let the final aggregator to send data to NIC to reduce contention.
+The bottleneck is the NIC to CPU. So it use the NVLink to exchange data, and let the final aggregator to send data to NIC to reduce contention.
 
 Some other analysis in this paper involves 1) why the divide the SS and CS and how to support async in this dividend; 2) Use pipeline to overlap processing time; 3) Amortize  RDMA WRITE round trip; 4) RDMA related issues (**interesting, you would not know in other places!!!**
 
