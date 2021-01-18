@@ -124,3 +124,28 @@ For failure recover, it employed the decentralized way to store the status and r
 - The allocation strategy (place low and high jobs as separately as possible) seems to cause low utilization, so multi-tenet on one GPU may be needed;
 - The benefit of this paper is that it reduce/restrict the GPU fragment, no more;
 - The performance of this solution highly depends on the jobs and the VC assignment.
+
+
+## [Heterogeneity-Aware Scheduling](https://www.usenix.org/conference/osdi20/presentation/narayanan-deepak)
+
+### Problems
+This paper identifies three problems in state-of-the-art GPU scheduling framework:
+
+- **Performance Heterogeneity** There are various type of accelerators, even GPU has different generations;
+- **Generality across Policies** Different users has different optimization goal, but existing framework embedded with specific policy, making them hard to extend;
+- **Co-location and Placement Optimizations** Co-location can improve utilization, but interference should be considered.
+
+### Solution
+This paper argues that we should explicitly schedule the tasks on various resources, e.g. GPU, TPU, FPGA. It needs to model the job allocation on different accelerators as an allocation matrix, X (the variant to solve), and the performance (in term of throughput) on different accelerators as T. It is noted that, T also contains the throughput if different jobs are spatial sharing an accelerator. The throughput matrix can be get from a pre-profiled database or profiled on the fly, and it also proposes a fingerprint profile matching solution using matrix completion.
+
+After solving the optimization problem in above model, the scheduler is in charge to move the allocation as close to the optimal solution as possible. This is achieved through a priority score matrix computed by the time spent on specific job on specific machine (see &5).
+
+The scheduling happens in stages (rounds), where the stages are divided by mini-batch (similar to that of Gandiva). to remedy the starvation problem. Considering scheduling with space sharing (SS) enabled is a NP-hard problem, the authors develop a greedy solution: 1) find the highest priority job and check whether its requirement can be fulfilled. if no, find the the next priority job, else 2) schedule this job and remove all jobs assignment contains this job to ensure the same job will not be scheduled more than once in one round.
+
+### Some thoughts
+- Section is of high value, need read more carefully;
+- What is the matrix completion discussed in section 6?
+- In experiments, it seems this solution is slightly better than Gandiva, I think it is reasonable, since its solution is similar to Gandiva, but the allocation is proved to be better than that of Gandiva;
+- Due to the current ML workload properties, this paper only consider space sharing of two jobs. This is OK now, but may be in the future it would encounter a scalability problem if multiple sharing is permitted, and as far as I know, solving optimal problem is time-consuming;
+- Compared to the **HiveD**, it does not pose burden to cluster assignment, so it would be a better solution;
+- Need revisit this paper in the future.
