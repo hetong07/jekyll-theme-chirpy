@@ -101,3 +101,26 @@ Some other analysis in this paper involves 1) why the divide the SS and CS and h
 ### Some thoughts
 I think the novelty in this paper is that it provides the theoretical analysis of the communication pattern in GPU scheduling, and it is the first, as far as I know, to consider the network and connection as whole. It also provides some very interesting knowledge related to RDMA. Such knowledge can be found in a NSDI paper from Microsoft two years ago.Beyond that, it also contributes to the PS architecture by splitting the SS and CS and place them on CPU and GPU, respectively. I am glad to learn so much internal knowledge of ML algorithms.
 
+## [HiveD: GPU affinity scheduling](https://www.usenix.org/conference/osdi20/presentation/zhao-hanyu)
+
+### Background
+The authors found that current scheduling design only consider the number of GPU required by a job, however, due to many reasons, mostly the network and interconnection I think, if the GPU affinity is not considered, the performance will degrade. This observation is a little bit similar to the Bytedance paper (in terms of interconnection), but the authors focus on another aspect.
+
+In current GPU cluster, users usually have the ability toe assign the affinity to a job, but due to the fragment, the affinity may not be fulfill, so a job can be starved. The authors further argue that reducing the fragment through scheduler is not easy to achieve since existing scheduler is already complicated. So they build a separate scheduler and use multi-level scheduling to solve this problem.
+
+### Solution
+> HiveD proposes to guarantee sharing safety (i.e., eliminating sharing anomaly as described in §2) as a prerequisite of sharing a GPU cluster. Specifically, if a sequence of GPU requests with affinity requirements can be satisfied in a private cluster, it should be satisfied in the corresponding virtual private cluster and the shared physical cluster.
+
+**The goal of this paper is to guarantee that job runs on cluster will not perform worse (in terms of queue delay) compared to on the private cluster.** The solution is very simple: it divides the GPU into 4 different layers: GPU (level-1), PCIe switch (level-2), CPU socket (level-3), and node levels (level-4), and exposes the structure of the GPU cluster to the schedulers. The scheduler is then only need to consult the structure assigned to users and try to allocate GPUs on different layers. Spiting and merging GPUs at different layer is exploit to reduce resource fragment.
+
+It also has a preempt based priority support to improve GPU utilization, but to reduce the preempt chance, it prefers to allocate low priority job to cluster and is farthest away high priority jobs and place high priority jobs with less low priority jobs as possible. 
+
+For failure recover, it employed the decentralized way to store the status and reconstruct the status during recover ( related to k8s knowledge).
+
+
+### Some thoughts
+- Exposing structure of GPU to upper layer is a usually a good way to solve complicated problem, but it requires the users or administrators to manually specify the GPU structure, which I think, would pose burden to them;
+- Exposing the structure fails to consider the interconnection interference within the same machine (as discussed in the *Heterogeneous scheduling*);
+- The allocation strategy (place low and high jobs as separately as possible) seems to cause low utilization, so multi-tenet on one GPU may be needed;
+- The benefit of this paper is that it reduce/restrict the GPU fragment, no more;
+- The performance of this solution highly depends on the jobs and the VC assignment.
