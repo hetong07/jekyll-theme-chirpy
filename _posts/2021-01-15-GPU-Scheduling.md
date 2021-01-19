@@ -149,3 +149,7 @@ The scheduling happens in stages (rounds), where the stages are divided by mini-
 - Due to the current ML workload properties, this paper only consider space sharing of two jobs. This is OK now, but may be in the future it would encounter a scalability problem if multiple sharing is permitted, and as far as I know, solving optimal problem is time-consuming;
 - Compared to the **HiveD**, it does not pose burden to cluster assignment, so it would be a better solution;
 - Need revisit this paper in the future.
+
+## Others
+- I remember that Prof. Arvind team has a [paper](https://homes.cs.washington.edu/~arvind/papers/nexus.pdf) talks about providing SLO for serving ML workload. It is also interesting since it points out that bin bucket is not sufficient for serving ML workflow with SLO on GPU cluster. I have forgotten its main idea, but I will read it again and add my understanding here later.
+- I haven't read [Tiresias](https://www.usenix.org/conference/nsdi19/presentation/gu).
