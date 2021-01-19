@@ -168,7 +168,7 @@ This paper uses multiple to solve this problem:
 
 When assign a job, the scheduler first tries to schedule it on minimal load nodes (prefer nodes with no load GPUs). If it cannot fulfill, the algorithm then gradually relax the affinity requirement. If there is no GPUs available, it migrates existing jobs to create usable resources. So migration is the least thing to do in scheduling. This approach make the job to run as fast as possible to fulfill the feature of training jobs.
 
-## Some thoughts
+### Some thoughts
 - The reason in section 6.4, the Ganvida can outperforms the YARN is due to the fact the the GPU requirement cannot be fulfill. It seems the advance of Ganvida cannot be totally attributed to migration.
 - Migration even on the basis of mini-batch is still time consuming, and considering the priority issue, it may causes it infeasible to fulfill next high priority jobs. Moreover, frequently migration may cause oscillation, which may hurts the performance even further.
 
