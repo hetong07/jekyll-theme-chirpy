@@ -150,6 +150,28 @@ The scheduling happens in stages (rounds), where the stages are divided by mini-
 - Compared to the **HiveD**, it does not pose burden to cluster assignment, so it would be a better solution;
 - Need revisit this paper in the future.
 
+## [Gandiva](https://www.usenix.org/conference/osdi18/presentation/xiao)
+
+### Background
+Gandiva is one the early solution to solve the ML training workload scheduling problem. And it also identifies some ML training workload properties as
+
+- Training workload often needs early feedback;
+- GPU affinity is important;
+- Memory usage reduced greatly on the boundary of two mini-batches;
+
+### Solution
+This paper uses multiple to solve this problem:
+- Time-slicing: multiple job that fit in one node shares the GPU resources through suspend-resuming techniques;
+- Packing: Spatial sharing GPU resources; To remedy interference problem, it measures the mini-batch processing time and memory usage to know whether two jobs can be co-located, i.e., if after scheduling, the processing increase, then this assignment should be revoked.
+- Grow-Shrink: Speculatively execute jobs on low utilization machines.
+- Migration: migration to remedy the fragment issue. migration can be done in < 4 seconds.
+
+When assign a job, the scheduler first tries to schedule it on minimal load nodes (prefer nodes with no load GPUs). If it cannot fulfill, the algorithm then gradually relax the affinity requirement. If there is no GPUs available, it migrates existing jobs to create usable resources. So migration is the least thing to do in scheduling. This approach make the job to run as fast as possible to fulfill the feature of training jobs.
+
+## Some thoughts
+- The reason in section 6.4, the Ganvida can outperforms the YARN is due to the fact the the GPU requirement cannot be fulfill. It seems the advance of Ganvida cannot be totally attributed to migration.
+- Migration even on the basis of mini-batch is still time consuming, and considering the priority issue, it may causes it infeasible to fulfill next high priority jobs. Moreover, frequently migration may cause oscillation, which may hurts the performance even further.
+
 ## Others
 - I remember that Prof. Arvind team has a [paper](https://homes.cs.washington.edu/~arvind/papers/nexus.pdf) talks about providing SLO for serving ML workload. It is also interesting since it points out that bin bucket is not sufficient for serving ML workflow with SLO on GPU cluster. I have forgotten its main idea, but I will read it again and add my understanding here later.
 - I haven't read [Tiresias](https://www.usenix.org/conference/nsdi19/presentation/gu).
